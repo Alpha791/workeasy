@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Homework Dashboard</title>
+  <meta name="description" content="Modern class homework dashboard with Firebase Firestore" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ---------- THE EXACT SAME STYLES AS BEFORE ---------- */
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --muted:#9aa7bd;
+      --accent:#6ee7b7;
+      --accent-2:#60a5fa;
+      --glass: rgba(255,255,255,0.03);
+      --danger:#ff7b7b;
+      color-scheme: dark;
+      font-family: 'Inter', system-ui;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:
+        linear-gradient(180deg, rgba(14,22,34,0.9), rgba(6,10,14,0.9)),
+        radial-gradient(800px 400px at 10% 10%, rgba(96,165,250,0.06), transparent 10%),
+        var(--bg);
+      color:#e6eef8;
+      display:flex;
+      min-height:100vh;
+      gap:24px;
+      padding:24px;
+    }
+
+    .app{
+      display:grid;
+      grid-template-columns:280px 1fr;
+      gap:24px;
+      width:100%;
+      max-width:1200px;
+      margin:0 auto;
+    }
+    @media (max-width:900px){
+      .app{grid-template-columns:1fr; padding-bottom:80px}
+      .sidebar{position:fixed; bottom:16px; left:16px; right:16px;}
+    }
+
+    /* Sidebar */
+    .sidebar{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px;
+      padding:20px;
+      height:fit-content;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .brand{display:flex;gap:12px;margin-bottom:18px}
+    .logo{
+      width:46px;height:46px;border-radius:10px;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:flex;align-items:center;justify-content:center;font-weight:700;color:#042;
+    }
+    .nav a{
+      display:block;
+      padding:10px;
+      text-decoration:none;
+      border-radius:8px;
+      color:#e6eef8;
+    }
+    .nav a.active,.nav a:hover{
+      background:linear-gradient(90deg,rgba(96,165,250,0.07), rgba(110,231,183,0.03));
+    }
+
+    /* Content */
+    .content{
+      background:rgba(255,255,255,0.02);
+      border-radius:12px;
+      padding:20px;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .top{display:flex;justify-content:space-between;align-items:center}
+
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+    .card{
+      background:rgba(255,255,255,0.02);
+      border:1px solid rgba(255,255,255,0.03);
+      padding:16px;
+      border-radius:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .modal{
+      position:fixed;inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(0,0,0,0.6);
+      padding:20px;
+    }
+    .modal.open{display:flex}
+    .sheet{
+      background:rgba(255,255,255,0.03);
+      padding:20px;
+      border-radius:12px;
+      width:100%;
+      max-width:600px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- ---------- SIDEBAR ---------- -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">HW</div>
+        <div>
+          <h1 style="margin:0;font-size:18px;">Class Dashboard</h1>
+          <div style="color:#9aa7bd;font-size:13px;">Homework Manager</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="#/dashboard" data-route="/dashboard" class="active">📋 Dashboard</a>
+        <a href="#/add" data-route="/add">➕ Add Homework</a>
+        <a href="#/calendar" data-route="/calendar">📆 Calendar</a>
+        <a href="#/subjects" data-route="/subjects">🏷 Subjects</a>
+      </nav>
+    </aside>
+
+    <!-- ---------- MAIN CONTENT ---------- -->
+    <main class="content">
+
+      <div class="top">
+        <div>
+          <h2 id="page-title">Dashboard</h2>
+          <div id="page-subtitle" style="color:#9aa7bd;font-size:13px;">Overview of your class homework</div>
+        </div>
+
+        <div class="search" style="display:flex;gap:8px;background:rgba(255,255,255,0.03);padding:8px 12px;border-radius:8px;">
+          🔎 <input id="search" placeholder="Search…" style="background:transparent;border:0;color:white;outline:none;">
+        </div>
+      </div>
+
+      <div id="page-root">
+
+        <!-- DASHBOARD PAGE -->
+        <section id="page-dashboard">
+          <div id="list" class="grid"></div>
+          <div id="empty" style="display:none;text-align:center;padding:40px;color:#9aa7bd;">
+            No homework yet.
+          </div>
+        </section>
+
+        <!-- ADD HOMEWORK PAGE -->
+        <section id="page-add" style="display:none;">
+          <form id="add-form" class="sheet">
+            <h3>Add Homework</h3>
+            <label>Title</label>
+            <input id="title" type="text" required />
+
+            <label>Description</label>
+            <textarea id="description"></textarea>
+
+            <label>Subject</label>
+            <input id="subject" type="text"/>
+
+            <label>Due Date</label>
+            <input id="dueDate" type="date"/>
+
+            <button id="submit-add" type="submit">Save</button>
+          </form>
+        </section>
+
+        <!-- CALENDAR PAGE -->
+        <section id="page-calendar" style="display:none;">
+          <h3>Calendar</h3>
+          <div id="calendar-list"></div>
+        </section>
+
+        <!-- SUBJECTS PAGE -->
+        <section id="page-subjects" style="display:none;">
+          <h3>Subjects</h3>
+          <div id="subjects-list"></div>
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ---------- MODAL ---------- -->
+  <div id="hw-modal" class="modal">
+    <div class="sheet">
+      <h3 id="hw-title"></h3>
+      <div id="hw-subject" style="color:#9aa7bd;"></div>
+      <p id="hw-desc"></p>
+      <div id="hw-due" style="color:#9aa7bd;font-size:13px;"></div>
+      <button id="hw-close">Close</button>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- =============== FIREBASE + DASHBOARD JS ================= -->
+  <!-- ========================================================= -->
+
+  <script type="module">
+
+    /* ----------------------------------------------------------
+     *  FIREBASE v12.6 CONFIG (YOUR CONFIG)
+     * ---------------------------------------------------------- */
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
+
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      doc,
+      updateDoc,
+      deleteDoc,
+      onSnapshot,
+      orderBy,
+      serverTimestamp,
+      query
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBYaGoRhvswFrS-FvVKgG7enHWvw4jMW94",
+      authDomain: "school-9bdca.firebaseapp.com",
+      projectId: "school-9bdca",
+      storageBucket: "school-9bdca.firebasestorage.app",
+      messagingSenderId: "191192802680",
+      appId: "1:191192802680:web:0a0f12ecf3bb9855a4148d",
+      measurementId: "G-KH51XX5T22"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getFirestore(app);
+    const homeworksCol = collection(db, "homeworks");
+
+    /* ----------------------------------------------------------
+     *  ROUTING
+     * ---------------------------------------------------------- */
+
+    const routes = {
+      "/dashboard": document.getElementById("page-dashboard"),
+      "/add": document.getElementById("page-add"),
+      "/calendar": document.getElementById("page-calendar"),
+      "/subjects": document.getElementById("page-subjects")
+    };
+
+    function router() {
+      const hash = location.hash || "#/dashboard";
+      const route = hash.replace("#", "");
+
+      Object.keys(routes).forEach(r => {
+        routes[r].style.display = r === route ? "" : "none";
+      });
+    }
+
+    window.addEventListener("hashchange", router);
+    window.addEventListener("load", router);
+
+    /* ----------------------------------------------------------
+     *  REALTIME FIRESTORE LISTENER
+     * ---------------------------------------------------------- */
+
+    onSnapshot(
+      query(homeworksCol, orderBy("createdAt", "desc")),
+      (snapshot) => {
+        const items = [];
+        snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        renderList(items);
+        renderSubjects(items);
+        renderCalendar(items);
+      }
+    );
+
+    /* ----------------------------------------------------------
+     *  RENDER LIST
+     * ---------------------------------------------------------- */
+
+    const listEl = document.getElementById("list");
+    const emptyEl = document.getElementById("empty");
+
+    function renderList(items) {
+      listEl.innerHTML = "";
+
+      if (items.length === 0) {
+        emptyEl.style.display = "block";
+        return;
+      }
+
+      emptyEl.style.display = "none";
+
+      items.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `
+          <strong>${item.title}</strong>
+          <div>${item.subject || "No subject"}</div>
+          <div>${item.dueDate || "No due date"}</div>
+          <button data-id="${item.id}">View</button>
+        `;
+        div.querySelector("button").onclick = () => openModal(item);
+        listEl.appendChild(div);
+      });
+    }
+
+    /* ----------------------------------------------------------
+     *  ADD HOMEWORK
+     * ---------------------------------------------------------- */
+
+    document.getElementById("add-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const newItem = {
+        title: document.getElementById("title").value,
+        description: document.getElementById("description").value,
+        subject: document.getElementById("subject").value,
+        dueDate: document.getElementById("dueDate").value,
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(homeworksCol, newItem);
+      location.hash = "/dashboard";
+    });
+
+    /* ----------------------------------------------------------
+     *  MODAL
+     * ---------------------------------------------------------- */
+
+    const modal = document.getElementById("hw-modal");
+
+    function openModal(item) {
+      modal.classList.add("open");
+      document.getElementById("hw-title").textContent = item.title;
+      document.getElementById("hw-subject").textContent = item.subject;
+      document.getElementById("hw-desc").textContent = item.description;
+      document.getElementById("hw-due").textContent = "Due: " + (item.dueDate || "None");
+    }
+
+    document.getElementById("hw-close").onclick = () => {
+      modal.classList.remove("open");
+    };
+
+    /* ----------------------------------------------------------
+     *  SUBJECTS PAGE
+     * ---------------------------------------------------------- */
+
+    const subjectsList = document.getElementById("subjects-list");
+    function renderSubjects(items) {
+      const subjects = [...new Set(items.map(i => i.subject).filter(Boolean))];
+      subjectsList.innerHTML = subjects.map(s => `<div>${s}</div>`).join("");
+    }
+
+    /* ----------------------------------------------------------
+     *  CALENDAR PAGE
+     * ---------------------------------------------------------- */
+
+    const calendarList = document.getElementById("calendar-list");
+    function renderCalendar(items) {
+      calendarList.innerHTML = items
+        .map(i => `<div>${i.dueDate || "No date"} — ${i.title}</div>`)
+        .join("");
+    }
+
+  </script>
+
+</body>
+</html>
